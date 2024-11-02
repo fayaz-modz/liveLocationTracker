@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Location Access</title>
+    <link rel="stylesheet" type="" href="/tailwind.css">
+  </head>
+  <body
+    class="h-screen w-full bg-gray-100 dark:bg-gray-950 grid place-items-center"
+  >
+    <div
+      class="rounded-lg bg-white dark:bg-gray-800 p-6 shadow-lg w-4/5 max-w-96"
+    >
+      <h1 class="mb-4 dark:text-gray-300 text-center text-2xl font-bold">
+        Location Tracker
+      </h1>
+
+      <button
+        id="getLocation"
+        class="w-full flex p-4 items-center mx-auto justify-around max-w-72 rounded dark:text-gray-200 bg-blue-500 py-2 font-semibold text-white transition hover:bg-blue-600"
+      >
+        <span class="flex-grow"> Get Location </span>
+        <svg
+          id="loadingBar"
+          class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            class="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-width="4"
+          ></circle>
+          <path
+            class="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          ></path>
+        </svg>
+      </button>
+      <p
+        id="coordinates"
+        class="mt-4 dark:text-gray-300 text-center text-gray-700"
+      >
+        Coordinates: Not available
+      </p>
+      <p id="address" class="mt-4 dark:text-gray-300 text-center text-gray-700">
+        Address: Not available
+      </p>
+    </div>
+    <script>
+      document.getElementById("getLocation").addEventListener("click", () => {
+        loadingBar.style.display = "inline";
+        if (navigator.geolocation) {
+          const loadingBar = document.getElementById("loadingBar");
+
+          navigator.geolocation.watchPosition(
+            async (position) => {
+              const { latitude, longitude } = position.coords;
+              loadingBar.style.display = "inline";
+
+              const address = await fetchAddress(latitude, longitude);
+              document.getElementById("coordinates").innerText =
+                `Coordinates: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+              document.getElementById("address").innerText =
+                `Address: ${address}`;
+
+              fetch("/updateLocation", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ latitude, longitude, address }),
+              });
+            },
+            (error) => {
+              loadingBar.style.display = "none";
+              switch (error.code) {
+                case error.PERMISSION_DENIED:
+                  alert("User denied the request for Geolocation.");
+                  break;
+                case error.POSITION_UNAVAILABLE:
+                  alert("Location information is unavailable.");
+                  break;
+                case error.TIMEOUT:
+                  alert("The request to get user location timed out.");
+                  break;
+                case error.UNKNOWN_ERROR:
+                  alert("An unknown error occurred.");
+                  break;
+              }
+            },
+            { timeout: 10000 },
+          );
+          loadingBar.style.display = "none";
+        } else {
+          alert("Geolocation is not supported by this browser.");
+        }
+      });
+
+      async function fetchAddress(latitude, longitude) {
+        const url = `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`;
+
+        const loadingBar = document.getElementById("loadingBar");
+        loadingBar.style.display = "inline"; // Show loading bar
+
+        try {
+          const response = await fetch(url);
+          const data = await response.json();
+          loadingBar.style.display = "none"; // Hide loading bar
+          return data.display_name || "Address: Not available";
+        } catch (err) {
+          loadingBar.style.display = "none"; // Hide loading bar on error
+          console.error("Error fetching address:", err);
+          return "Address: Not available";
+        }
+      }
+    </script>
+  </body>
+</html>
